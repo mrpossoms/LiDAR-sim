@@ -1,0 +1,25 @@
+location: gitman_sources
+sources:
+  - name: g.h
+    type: git
+    repo: https://github.com/mrpossoms/g.h.git
+    sparse_paths:
+      -
+    rev: main 
+  - name: emsdk
+    type: git
+    repo: https://github.com/emscripten-core/emsdk.git
+    sparse_paths:
+      -
+    rev: main
+sources_locked:
+  - 
+default_group: native
+groups:
+  - name: native
+    members:
+      - g.h
+  - name: web
+    members:
+      - g.h
+      - emsdk
