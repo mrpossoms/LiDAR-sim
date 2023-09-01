@@ -1,27 +1,6 @@
 #include "g.h"
 #include "state.hpp"
-
-struct my_game : public g::core
-{
-
-	g::asset::store assets;
-	game::state state;
-
-	my_game() = default;
-	~my_game() = default;
-
-	virtual bool initialize()
-	{
-		return true;
-	}
-
-	virtual void update(float dt)
-	{
-		glClearColor(0.5, 0.5, 1.0, 1.0);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	}
-
-};
+#include "lidar/sim.hpp"
 
 #ifdef __EMSCRIPTEN__
 EM_JS(int, canvas_get_width, (), {
@@ -35,11 +14,11 @@ EM_JS(int, canvas_get_height, (), {
 
 int main (int argc, const char* argv[])
 {
-	my_game game;
+	lidar::sim sim;
 
 	g::core::opts opts;
 
-	opts.name = "my game";
+	opts.name = "LiDAR sim demo";
 	opts.gfx.fullscreen = false;
 
 #ifdef __EMSCRIPTEN__
@@ -52,7 +31,7 @@ int main (int argc, const char* argv[])
 	opts.gfx.fullscreen = false;
 #endif
 
-	game.start(opts);
+	sim.start(opts);
 
 	return 0;
 }

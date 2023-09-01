@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(example-project VERSION 0.0.1 LANGUAGES CXX)
+project(LiDAR-sim VERSION 0.0.1 LANGUAGES CXX)
 
 if(CMAKE_CXX_COMPILER MATCHES "/em\\+\\+(-[a-zA-Z0-9.])?$")
   message(" * C++ compiler: Emscripten")
@@ -47,7 +47,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGL_SILENCE_DEPRECATION")
 add_subdirectory(gitman_sources/g.h)
 
 # add all source files
-set(SOURCE ${SOURCE} src/main.cpp)
+set(SOURCE ${SOURCE} src/main.cpp src/lidar/sim.cpp)
 
 # add game includes
 include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
