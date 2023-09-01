@@ -1,5 +1,7 @@
 #include <g.h>
 
+using mat4 = xmath::mat<4, 4>;
+
 namespace lidar
 {
 
@@ -16,7 +18,7 @@ struct sim : public g::core
 
 	g::gfx::mesh<vertex::pos_uv_norm> plane;
 	g::gfx::mesh<vertex::pos_uv_norm> cube;
-	g::gfx::framebuffer lidar_frame;
+	// g::gfx::framebuffer lidar_frame;
 	g::game::fps_camera user_camera;
 };
 

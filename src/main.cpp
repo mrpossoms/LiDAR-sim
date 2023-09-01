@@ -16,10 +16,14 @@ int main (int argc, const char* argv[])
 {
 	lidar::sim sim;
 
-	g::core::opts opts;
-
-	opts.name = "LiDAR sim demo";
-	opts.gfx.fullscreen = false;
+	g::core::opts opts = {
+		.name = "LiDAR sim demo",
+		.gfx = {
+			.display = true,
+			.width = 1024,
+			.height = 768 
+		}
+	};
 
 #ifdef __EMSCRIPTEN__
 	auto monitor = glfwGetPrimaryMonitor();
