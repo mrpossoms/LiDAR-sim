@@ -17,6 +17,7 @@ struct sim : public g::core
 	g::gfx::mesh<vertex::pos_uv_norm> plane;
 	g::gfx::mesh<vertex::pos_uv_norm> cube;
 	g::gfx::framebuffer lidar_frame;
+	g::fps_camera user_camera;
 };
 
 }
