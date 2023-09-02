@@ -16,7 +16,7 @@ struct sim : public g::core
 
 	virtual void update(float dt);
 
-	g::gfx::mesh<vertex::pos_uv_norm> plane;
+	g::gfx::mesh<vertex::pos_uv_norm> ground;
 	g::gfx::mesh<vertex::pos_uv_norm> cube;
 	// g::gfx::framebuffer lidar_frame;
 	g::game::fps_camera user_camera;

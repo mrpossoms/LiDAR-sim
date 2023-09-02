@@ -9,7 +9,27 @@ lidar::sim::sim()
 bool lidar::sim::initialize()
 {
 	cube = g::gfx::mesh_factory::cube(); 
-	plane = g::gfx::mesh_factory::plane({0, 1, 0}, {100, 100});
+	// ground = g::gfx::mesh_factory::plane(); //{0, 1, 0}, {100, 100});
+
+    auto vertex_generator = [](const texture& tex, int x, int y) -> vertex::pos_uv_norm {
+        return {
+            // position
+            {
+                x - tex.size[0] * 0.5f,
+                static_cast<float>(tex.sample(x, y)[0] * 0.25f),
+                y - tex.size[1] * 0.5f,
+            },
+            // uv
+            {
+                x / (float)tex.size[0],
+                y / (float)tex.size[1],
+            },
+            // normal
+            { 0, 1, 0 }
+        };
+    };
+    ground = g::gfx::mesh_factory::from_heightmap(assets.tex("heightmap.png")); //<vertex::pos_uv_norm>(assets.tex("heightmap.png"), vertex_generator);
+
 
 	// lidar_frame = framebuffer_factory{ 1024, 128 }.depth().create();
 
@@ -55,7 +75,7 @@ bool lidar::sim::initialize()
     };
     // glfwSetInputMode(g::gfx::GLFW_WIN, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-    glCullFace(GL_FRONT);
+    // glCullFace(GL_FRONT);
     glClearColor(0.5, 0.5, 1.0, 1.0);
 
 	return true;
@@ -63,20 +83,21 @@ bool lidar::sim::initialize()
 
 void lidar::sim::update(float dt)
 {
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
     user_camera.aspect_ratio(g::gfx::aspect());
     user_camera.pre_update(dt, 0);
     user_camera.update(dt, 0);
 
-    // glDisable(GL_CULL_FACE);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	// plane.using_shader(assets.shader("basic_color.vs+basic_color.fs"))
-	// .set_camera(user_camera)
-	// ["u_model"].mat4(mat4::translation({0, 0, 0}))
-	// .draw<GL_TRIANGLE_FAN>();
+	ground.using_shader(assets.shader("basic_color.vs+basic_color.fs"))
+	.set_camera(user_camera)
+	["u_model"].mat4(mat4::translation({0, 0, 0}) * mat4::scale({1, 0.1, 1}))
+	.draw<GL_POINTS>();
 
 	cube.using_shader(assets.shader("basic_color.vs+basic_color.fs"))
 	.set_camera(user_camera)
-    ["u_model"].mat4(mat4::translation({0, 0.5, 0}))
-	.draw<GL_TRIANGLES>();
+    ["u_model"].mat4(mat4::translation({0, 4, 0}))
+	.draw<GL_TRIANGLES>();		
+
+
 }
