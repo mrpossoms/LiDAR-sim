@@ -1,9 +1,9 @@
-in vec4 v_frame_space_pos;
+in float v_depth;
 
 out vec4 color;
 
 void main (void)
 {
-    color = v_frame_space_pos;
+    color.r = v_depth;
     // color = vec4(vec3(gl_FragCoord.z), 1.0);
 }

@@ -9,29 +9,12 @@ lidar::sim::sim()
 bool lidar::sim::initialize()
 {
 	cube = g::gfx::mesh_factory::cube(); 
-	// ground = g::gfx::mesh_factory::plane(); //{0, 1, 0}, {100, 100});
+    ground = g::gfx::mesh_factory::from_heightmap(assets.tex("heightmap.png"));
 
-    auto vertex_generator = [](const texture& tex, int x, int y) -> vertex::pos_uv_norm {
-        return {
-            // position
-            {
-                x - tex.size[0] * 0.5f,
-                static_cast<float>(tex.sample(x, y)[0] * 0.25f),
-                y - tex.size[1] * 0.5f,
-            },
-            // uv
-            {
-                x / (float)tex.size[0],
-                y / (float)tex.size[1],
-            },
-            // normal
-            { 0, 1, 0 }
-        };
-    };
-    ground = g::gfx::mesh_factory::from_heightmap(assets.tex("heightmap.png")); //<vertex::pos_uv_norm>(assets.tex("heightmap.png"), vertex_generator);
-
-
-	// lidar_frame = framebuffer_factory{ 1024, 128 }.depth().create();
+    lidar_frame = texture_factory{ 8, 8 }.type(GL_FLOAT).components(3).pixelated().create();
+	lidar_fb = framebuffer_factory{ lidar_frame }.depth().create();
+	lidar_camera.aspect_ratio(lidar_frame.aspect());
+	lidar_camera.position = {0, 10, 0};
 
 	user_camera.gravity = {};
 	user_camera.position = {0, 10, 0};
@@ -73,31 +56,46 @@ bool lidar::sim::initialize()
             glfwSetInputMode(g::gfx::GLFW_WIN, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         }
     };
-    // glfwSetInputMode(g::gfx::GLFW_WIN, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-    // glCullFace(GL_FRONT);
     glClearColor(0.5, 0.5, 1.0, 1.0);
 
 	return true;
 }
 
+void lidar::sim::draw_scene(const g::game::camera& cam)
+{
+	ground.using_shader(assets.shader("basic_color.vs+basic_color.fs"))
+	.set_camera(cam)
+	["u_model"].mat4(mat4::translation({0, 0, 0}) * mat4::scale({1, 0.1, 1}))
+	.draw<GL_TRIANGLES>();
+
+	cube.using_shader(assets.shader("basic_color.vs+basic_color.fs"))
+	.set_camera(cam)
+    ["u_model"].mat4(mat4::translation({0, 4, -15}))
+	.draw<GL_TRIANGLES>();
+}
+
 void lidar::sim::update(float dt)
 {
+	float* lidar_depths = nullptr;
+	size_t lidar_depths_size = 0;
+	lidar_frame.get_pixels((unsigned char**)&lidar_depths, lidar_depths_size);
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     user_camera.aspect_ratio(g::gfx::aspect());
     user_camera.pre_update(dt, 0);
     user_camera.update(dt, 0);
 
-	ground.using_shader(assets.shader("basic_color.vs+basic_color.fs"))
-	.set_camera(user_camera)
-	["u_model"].mat4(mat4::translation({0, 0, 0}) * mat4::scale({1, 0.1, 1}))
-	.draw<GL_POINTS>();
+    g::game::camera* render_cam = &user_camera;
 
-	cube.using_shader(assets.shader("basic_color.vs+basic_color.fs"))
-	.set_camera(user_camera)
-    ["u_model"].mat4(mat4::translation({0, 4, 0}))
-	.draw<GL_TRIANGLES>();		
+    if (glfwGetKey(g::gfx::GLFW_WIN, GLFW_KEY_C)) { render_cam = &lidar_camera; }
 
+    draw_scene(*render_cam);
 
+    {
+    	g::gfx::framebuffer::scoped_draw fb(lidar_fb);
+
+    	draw_scene(lidar_camera);
+    }
 }

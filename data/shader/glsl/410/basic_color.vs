@@ -17,7 +17,7 @@ void main (void)
 {
 	vec4 v_world_pos = u_model * vec4(a_position, 1.0);
 	vec4 screen_pos = u_proj * u_view * v_world_pos;
-	gl_Position = screen_pos / screen_pos.w;
+	gl_Position = screen_pos;
 
 	v_normal = a_normal;
 	v_uv = a_uv;
