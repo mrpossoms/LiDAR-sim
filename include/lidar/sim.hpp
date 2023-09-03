@@ -23,6 +23,10 @@ struct sim : public g::core
 	g::gfx::texture lidar_frame;
 	g::gfx::framebuffer lidar_fb;
 	g::game::camera_perspective lidar_camera;
+	g::gfx::vertex::pos* lidar_rays_basis;
+	g::gfx::vertex::pos* lidar_rays;
+	g::gfx::mesh<vertex::pos> lidar_point_cloud;
+	vec<2, unsigned> lidar_res;
 	g::game::fps_camera user_camera;
 };
 
