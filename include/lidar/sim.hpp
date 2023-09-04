@@ -16,7 +16,7 @@ struct sim : public g::core
 
 	virtual void update(float dt);
 
-	void draw_scene(const g::game::camera& cam);
+	void draw_scene(g::gfx::shader& shader, const g::game::camera& cam);
 
 	g::gfx::mesh<vertex::pos_uv_norm> ground;
 	g::gfx::mesh<vertex::pos_uv_norm> cube;

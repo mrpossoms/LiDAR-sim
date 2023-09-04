@@ -4,6 +4,6 @@ out vec4 color;
 
 void main (void)
 {
-    color.r = v_depth;
-    // color = vec4(vec3(gl_FragCoord.z), 1.0);
+    // color.rgb = vec3(1.0, 1.0, 0.0);
+    color = vec4(vec3(1.0), 1.0);
 }
