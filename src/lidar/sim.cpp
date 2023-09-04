@@ -1,7 +1,7 @@
 
 #include "lidar/sim.hpp"
 
-lidar::sim::sim() : lidar_res({ 1, 1 })
+lidar::sim::sim() : lidar_res({ 128, 128 })
 {
 	auto fov_h = lidar_camera.field_of_view;
 	auto fov_v = lidar_camera.field_of_view;
@@ -28,7 +28,7 @@ bool lidar::sim::initialize()
 	cube = g::gfx::mesh_factory::cube(); 
     ground = g::gfx::mesh_factory::from_heightmap(assets.tex("heightmap.png"));
 
-    lidar_frame = texture_factory{ lidar_res[0], lidar_res[1] }.type(GL_INT).components(3).pixelated().create();
+    lidar_frame = texture_factory{ lidar_res[0], lidar_res[1] }.type(GL_FLOAT).components(4).pixelated().create();
 	lidar_fb = framebuffer_factory{ lidar_frame }.depth().create();
 	lidar_point_cloud = g::gfx::mesh_factory::empty_mesh<vertex::pos>();
 	lidar_camera.aspect_ratio(lidar_frame.aspect());
@@ -126,7 +126,7 @@ void lidar::sim::update(float dt)
 
 	{
 		g::gfx::framebuffer::scoped_draw fb(lidar_fb);
-		glReadPixels(0, 0, lidar_frame.size[0], lidar_frame.size[1], GL_DEPTH_COMPONENT, GL_FLOAT, lidar_depths);
+		glReadPixels(0, 0, lidar_frame.size[0], lidar_frame.size[1], GL_RED, GL_FLOAT, lidar_depths);
 		// print_depths(lidar_depths, lidar_frame);
 
         float min = 1000, max = 0;
@@ -167,7 +167,7 @@ void lidar::sim::update(float dt)
     user_camera.pre_update(dt, 0);
     user_camera.update(dt, 0);
 
-    lidar_camera.position = {0, 10 + sin(t += dt), -15};
+    lidar_camera.position = {0, 10, -15};
 
     g::game::camera* render_cam = &user_camera;
 
