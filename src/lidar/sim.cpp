@@ -6,8 +6,8 @@ void unit_sphere_basis(
 	const g::game::camera_perspective& lidar_camera,
 	g::gfx::vertex::pos_uv* basis)
 {
-	auto fov_h = lidar_camera.field_of_view;
-	auto fov_v = lidar_camera.field_of_view;
+	auto fov_h = lidar_camera.fov_horizontal;
+	auto fov_v = lidar_camera.fov_vertical;
 
 	for (int r = 0; r < lidar_res[0]; r++)
 	{
@@ -24,18 +24,13 @@ void unit_sphere_basis(
 	}
 }
 
-void rectilinear_basis(
+void cylindrical_basis(
 	const vec<2, unsigned>& lidar_res,
 	const g::game::camera_perspective& lidar_camera,
 	g::gfx::vertex::pos_uv* basis)
 {
-	auto fov_h = lidar_camera.field_of_view;
-	auto fov_v = lidar_camera.field_of_view;
-
-	auto P = lidar_camera.projection();
-	auto P_inv = P.invert();
-	auto projected = P * vec<4>{0, 0, lidar_camera.far, 1.f};
-	auto w = projected[3]; 
+	auto fov_h = lidar_camera.fov_horizontal;
+	auto fov_v = lidar_camera.fov_vertical;
 
 	for (int r = 0; r < lidar_res[0]; r++)
 	{
@@ -44,28 +39,54 @@ void rectilinear_basis(
 
 		for (int c = 0; c < lidar_res[1]; c++)
 		{
-			auto c_p = c / (float)lidar_res[1];
+			float az = (c / (float)lidar_res[1]) * fov_h - (fov_h / 2);
+			auto R_az = mat4::rotation({0, 1, 0}, az);
+			basis[r * lidar_res[1] + c].position = R_az * vec<3>{0, -r_p, -1};
+			basis[r * lidar_res[1] + c].uv = vec<2>{az, r_p};
+		}
+	}
+}
+
+void rectilinear_basis(
+	const vec<2, unsigned>& lidar_res,
+	const g::game::camera_perspective& lidar_camera,
+	g::gfx::vertex::pos_uv* basis)
+{
+	auto fov_h = lidar_camera.fov_horizontal;
+	auto fov_v = lidar_camera.fov_vertical;
+
+	auto P = lidar_camera.projection();
+	auto P_inv = P.invert();
+	auto projected = P * vec<4>{0, 0, lidar_camera.far, 1.f};
+	auto w = projected[3]; 
+
+	for (int r = 0; r < lidar_res[1]; r++)
+	{
+		auto r_p = r / (float)lidar_res[1];
+		r_p = (r_p * 2) - 1;
+
+		for (int c = 0; c < lidar_res[0]; c++)
+		{
+			auto c_p = c / (float)lidar_res[0];
 			c_p = (c_p * 2) - 1;
 
 			auto unprojected = P_inv * vec<4>{c_p, r_p, 1.f, w};
 
-			basis[r * lidar_res[1] + c].position = vec<3>{c_p, -r_p, -1.f}.unit();
-			basis[r * lidar_res[1] + c].uv = {c_p, r_p};
+			basis[r * lidar_res[0] + c].position = vec<3>{c_p, -r_p, -1.f}.unit();
+			basis[r * lidar_res[0] + c].uv = {c_p, r_p};
 		}
 	}
 }
 
 
 
-lidar::sim::sim() : lidar_res({ 128, 128 })
+lidar::sim::sim() : lidar_res({ 256, 256 })
 {
-	auto fov_h = lidar_camera.field_of_view;
-	auto fov_v = lidar_camera.field_of_view;
-
 	lidar_rays_basis = new g::gfx::vertex::pos_uv[lidar_res[0] * lidar_res[1]];
 	lidar_rays = new g::gfx::vertex::pos_uv[lidar_res[0] * lidar_res[1]];
 
 	rectilinear_basis(lidar_res, lidar_camera, lidar_rays_basis);
+	// cylindrical_basis(lidar_res, lidar_camera, lidar_rays_basis);
 }
 
 bool lidar::sim::initialize()
@@ -76,14 +97,15 @@ bool lidar::sim::initialize()
     lidar_frame = texture_factory{ lidar_res[0], lidar_res[1] }.type(GL_FLOAT).components(4).pixelated().create();
 	lidar_fb = framebuffer_factory{ lidar_frame }.depth().create();
 	lidar_point_cloud = g::gfx::mesh_factory::empty_mesh<vertex::pos_uv>();
-	lidar_camera.aspect_ratio(lidar_frame.aspect());
 	lidar_camera.position = {0, 10, 10};
+	lidar_camera.fov_vertical = M_PI / 2;
+	lidar_camera.fov_horizontal = M_PI / 2;
 
 	std::random_device rd{};
     std::mt19937 gen{rd()};
     std::normal_distribution d{0.f, 0.1f};
  
-	lidar_noise = g::gfx::texture_factory{256, 256}.components(4)
+	lidar_noise = g::gfx::texture_factory{lidar_res[0], lidar_res[1]}.components(4)
 	                                               .type(GL_FLOAT)
 	                                               .smooth()
 	                                               .fill([&](unsigned x, unsigned y, unsigned z, unsigned char* data){
@@ -179,28 +201,30 @@ void lidar::sim::update(float dt)
 
 	if (lidar_depths == nullptr)
 	{
-		lidar_depths = new float[lidar_frame.size[0] * lidar_frame.size[1]];
+		lidar_depths = new float[lidar_res[0] * lidar_res[1]];
 	}
 
+	lidar_res[1] = static_cast<unsigned>((cos(t) + 1) * 128);
+
 	{
-		g::gfx::framebuffer::scoped_draw fb(lidar_fb);
-		glReadPixels(0, 0, lidar_frame.size[0], lidar_frame.size[1], GL_RED, GL_FLOAT, lidar_depths);
+		g::gfx::framebuffer::scoped_draw fb(lidar_fb, {0, 0}, lidar_res);
+		glReadPixels(0, 0, lidar_res[0], lidar_res[1], GL_RED, GL_FLOAT, lidar_depths);
 		// print_depths(lidar_depths, lidar_frame);
 
         float min = 1000, max = 0;
 
         // depth only
-		for (unsigned r = 0; r < lidar_frame.size[0]; r++)
+		for (unsigned r = 0; r < lidar_res[1]; r++)
 		{
-			for (unsigned c = 0; c < lidar_frame.size[1]; c++)
+			for (unsigned c = 0; c < lidar_res[0]; c++)
 			{
-				auto d = lidar_depths[((lidar_frame.size[0]-1) - r) * lidar_frame.size[1] + c];// * 1000;
+				auto d = lidar_depths[((lidar_res[1]-1) - r) * lidar_res[0] + c];// * 1000;
                 min = std::min(min, d);
                 max = std::max(max, d);
-				lidar_rays[r * lidar_frame.size[1] + c].position = lidar_rays_basis[r * lidar_frame.size[1] + c].position * d;
+				lidar_rays[r * lidar_res[0] + c].position = lidar_rays_basis[r * lidar_res[0] + c].position * d;
 			}
 		}
-		lidar_point_cloud.set_vertices(lidar_rays, lidar_frame.size[0] * lidar_frame.size[1]);
+		lidar_point_cloud.set_vertices(lidar_rays, lidar_res[0] * lidar_res[1]);
 
         std::cout << "min: " << min << " max: " << max << std::endl;
 	}
