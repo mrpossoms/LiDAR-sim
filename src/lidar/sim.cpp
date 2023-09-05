@@ -60,29 +60,30 @@ void rectilinear_basis(
 	auto projected = P * vec<4>{0, 0, lidar_camera.far, 1.f};
 	auto w = projected[3]; 
 
+	auto quarter_w = lidar_res[0] / 4;
 
-	// for (unsigned )
+	for (unsigned dir = 0; dir < 4; dir++)
 	for (int r = 0; r < lidar_res[1]; r++)
 	{
 		auto r_p = r / (float)lidar_res[1];
 		r_p = (r_p * 2) - 1;
 
-		for (int c = 0; c < lidar_res[0]; c++)
+		for (int c = 0; c < quarter_w; c++)
 		{
-			auto c_p = c / (float)lidar_res[0];
+			auto c_p = c / (float)quarter_w;
 			c_p = (c_p * 2) - 1;
 
 			auto unprojected = P_inv * vec<4>{c_p, r_p, 1.f, w};
 
-			basis[r * lidar_res[0] + c].position = vec<3>{c_p, -r_p, -1.f}.unit();//quat<>::from_axis_angle({0, 1, 0}, d * M_PI / 2).rotate({c_p, -r_p, -1.f}).unit();
-			basis[r * lidar_res[0] + c].uv = {c_p, r_p};
+			basis[r * lidar_res[0] + (dir * quarter_w) + c].position = quat<>::from_axis_angle({0, 1, 0}, dir * M_PI / 2).rotate({c_p, -r_p, -1.f}).unit();
+			basis[r * lidar_res[0] + (dir * quarter_w) + c].uv = {c_p, r_p};
 		}
 	}
 }
 
 
 
-lidar::sim::sim() : lidar_res({ 256, 128 })
+lidar::sim::sim() : lidar_res({ 1024, 128 })
 {
 	lidar_rays_basis = new g::gfx::vertex::pos_uv[lidar_res[0] * lidar_res[1]];
 	lidar_rays = new g::gfx::vertex::pos_uv[lidar_res[0] * lidar_res[1]];
@@ -163,10 +164,14 @@ bool lidar::sim::initialize()
 	return true;
 }
 
-void lidar::sim::draw_scene(g::gfx::shader& shader, const g::game::camera& cam, float t)
+float t = 0;
+
+void lidar::sim::draw_scene(g::gfx::shader& shader, const g::game::camera& cam, int d)
 {
 	ground.using_shader(shader)
-	.set_camera(cam)
+	// .set_camera(cam)
+	["u_view"].mat4(cam.view() * mat4::rotation({0, 1, 0}, d * M_PI / 2))
+	["u_proj"].mat4(cam.projection().transpose())
 	["u_brightness"].flt(0.25)
 	["u_model"].mat4(mat4::translation({0, 0, 0}) * mat4::scale({1, 0.1, 1}))
 	["u_lidar_noise"].texture(lidar_noise)
@@ -174,28 +179,15 @@ void lidar::sim::draw_scene(g::gfx::shader& shader, const g::game::camera& cam, 
 	.draw<GL_TRIANGLES>();
 
 	cube.using_shader(shader)
-	.set_camera(cam)
 	["u_brightness"].flt(0.25)
-    ["u_model"].mat4(mat4::translation({0, 4, -15}))
+    ["u_model"].mat4(mat4::translation({cos(t) * 4, 4, -15}))
     ["u_lidar_noise"].texture(lidar_noise)
 	["u_time"].flt(t)
 	.draw<GL_TRIANGLES>();
 }
 
-static void print_depths(const float* depths, const texture& lidar_frame)
-{
-	for (unsigned r = 0; r < lidar_frame.size[0]; r++)
-	{
-		for (unsigned c = 0; c < lidar_frame.size[1]; c++)
-		{
-			std::cout << depths[r * lidar_frame.size[1] + c] << " ";
-		}		
-		std::cout << std::endl;
-	}
-	std::cout << "--------" << std::endl;
-}
-
-float t = 0;
+unsigned samples = 1;
+float estimated_time = 0;
 
 void lidar::sim::update(float dt)
 {
@@ -223,7 +215,7 @@ void lidar::sim::update(float dt)
     if (glfwGetKey(g::gfx::GLFW_WIN, GLFW_KEY_C)) { render_cam = &lidar_camera; }
 
     auto& vis_shader = assets.shader("basic_color.vs+basic_color.fs");
-    draw_scene(vis_shader, *render_cam, t);
+    draw_scene(vis_shader, *render_cam);
 
     bool depth_test = !glfwGetKey(g::gfx::GLFW_WIN, GLFW_KEY_V);
     
@@ -236,18 +228,25 @@ void lidar::sim::update(float dt)
     if (!depth_test) glEnable(GL_DEPTH_TEST);
 
     auto start = std::chrono::high_resolution_clock::now();
-    {
+
+    { // clear lidar buffers
     	g::gfx::framebuffer::scoped_draw fb(lidar_fb, {0, 0}, lidar_res);
 	    glClearColor(0, 0.25, 0.25, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    	draw_scene(assets.shader("depth_only.vs+depth_only.fs"), lidar_camera, t);
     }
 
-	{
+    for (unsigned d = 0; d < 4; d++)
+    {
+    	g::gfx::framebuffer::scoped_draw fb(lidar_fb, {d * lidar_res[0]/4, 0}, {(d+1) * lidar_res[0]/4, lidar_res[1]});
+	    // glClearColor(0, 0.25, 0.25, 1.0);
+		// glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    	draw_scene(assets.shader("depth_only.vs+depth_only.fs"), lidar_camera, d);
+    }
+
+	{ // read depths from lidar framebuffer
 		g::gfx::framebuffer::scoped_draw fb(lidar_fb, {0, 0}, lidar_res);
 		glReadPixels(0, 0, lidar_res[0], lidar_res[1], GL_RED, GL_FLOAT, lidar_depths);
-		// print_depths(lidar_depths, lidar_frame);
-
+		
         float min = 1000, max = 0;
 
         // depth only
@@ -268,7 +267,12 @@ void lidar::sim::update(float dt)
 	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-	std::cout << "Expected render time: " << elapsed.count() << "ms" << std::endl;
+
+	float a = 1 / samples;
+	estimated_time = (1 - a) * estimated_time + a * elapsed.count();
+	samples++;
+
+	std::cout << "Expected render time: " << estimated_time << "ms" << std::endl;
 
 
     t += dt;
